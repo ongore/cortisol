@@ -118,18 +118,25 @@ export function TokenCard({ item, index }: TokenCardProps) {
     : "";
 
   const positives = discovery.positives.slice(0, 6);
+  const pipe = item.pipeline;
+  const buyUrl = pipe?.integrations?.jupiter?.swap_preview_url_solana ?? null;
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       className={
-        "group reveal block hairline bg-[var(--color-bg-2)] hover:border-[var(--color-acid)] transition-colors duration-200 " +
+        "relative group reveal block hairline bg-[var(--color-bg-2)] hover:border-[var(--color-acid)] transition-colors duration-200 " +
         badBorder
       }
       style={{ animationDelay: `${Math.min(index * 40, 600)}ms` }}
     >
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute inset-0 z-[10]"
+        aria-label="Open Dex pair / chart"
+      />
+      <div className="relative z-[20] pointer-events-none flex flex-col">
       <div className="flex items-center justify-between border-b border-[var(--color-line)] px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] uppercase gap-2 flex-wrap">
         <span className="text-[var(--color-ink-faint)] tab-num shrink-0">
           № {String(index + 1).padStart(3, "0")}
@@ -160,6 +167,29 @@ export function TokenCard({ item, index }: TokenCardProps) {
           )}
         </div>
       </div>
+
+      {pipe ? (
+        <div className="relative z-[30] pointer-events-auto px-3 py-1.5 border-b border-[var(--color-line)] bg-[var(--color-bg)] font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--color-ink-dim)] flex flex-wrap gap-x-3 gap-y-1">
+          <span className="text-[var(--color-acid)]">
+            SIG {pipe.signal_score ?? "—"}
+          </span>
+          <span>RISK · {pipe.risk_label ?? "—"}</span>
+          <span>
+            MVP ·{" "}
+            {pipe.market_all_pass ? (
+              <span className="text-[var(--color-acid)]">PASS</span>
+            ) : (
+              <span className="text-[var(--color-blood)]">FAIL</span>
+            )}
+          </span>
+          <span>
+            ALERT ELIGIBLE ·{" "}
+            <span className={pipe.eligible_for_trade_alert ? "text-[var(--color-acid)]" : ""}>
+              {pipe.eligible_for_trade_alert ? "YES" : "NO"}
+            </span>
+          </span>
+        </div>
+      ) : null}
 
       {pair_fetch_error && (
         <div className="px-3 py-1 font-mono text-[10px] text-[var(--color-blood)] border-b border-[var(--color-line)] tracking-[0.12em] uppercase bg-[var(--color-bg)]">
@@ -248,7 +278,7 @@ export function TokenCard({ item, index }: TokenCardProps) {
             type="button"
             onClick={copy}
             title="Copy address"
-            className="font-mono text-[11px] text-[var(--color-ink-dim)] hover:text-[var(--color-acid)] tracking-tight text-left"
+            className="relative z-[40] pointer-events-auto font-mono text-[11px] text-[var(--color-ink-dim)] hover:text-[var(--color-acid)] tracking-tight text-left"
           >
             {copied ? "COPIED ✓" : shortAddress(profile.tokenAddress)}
           </button>
@@ -283,7 +313,7 @@ export function TokenCard({ item, index }: TokenCardProps) {
                   e.stopPropagation();
                   window.open(link.url, "_blank", "noopener,noreferrer");
                 }}
-                className="cursor-pointer font-mono text-[10px] tracking-[0.18em] uppercase px-2 py-1 border border-[var(--color-line)] text-[var(--color-ink-dim)] hover:border-[var(--color-acid)] hover:text-[var(--color-acid)] transition-colors"
+                className="relative z-[40] cursor-pointer pointer-events-auto font-mono text-[10px] tracking-[0.18em] uppercase px-2 py-1 border border-[var(--color-line)] text-[var(--color-ink-dim)] hover:border-[var(--color-acid)] hover:text-[var(--color-acid)] transition-colors"
               >
                 [{linkCode(link)}]
               </span>
@@ -292,12 +322,32 @@ export function TokenCard({ item, index }: TokenCardProps) {
         )}
       </div>
 
+        {buyUrl && (
+          <div className="relative z-[40] px-3 pt-3 pointer-events-auto">
+            <a
+              href={buyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              className="inline-flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase px-3 py-1.5 border border-[var(--color-acid-dim)] text-[var(--color-acid)] hover:bg-[var(--color-acid)] hover:text-[var(--color-bg)] transition-colors"
+            >
+              Buy preview (Jupiter) ↗
+            </a>
+            <span className="block mt-2 font-mono text-[9px] text-[var(--color-ink-faint)] normal-case tracking-normal">
+              Opens Jupiter UI — Phantom routing lands in v3/v4 infra.
+            </span>
+          </div>
+        )}
+
       <div className="flex items-center justify-between border-t border-[var(--color-line)] px-3 py-2 font-mono text-[10px] tracking-[0.18em] uppercase text-[var(--color-ink-faint)]">
         <span>{item.pair?.pairAddress ? "open pair" : "view on dex"}</span>
         <span className="text-[var(--color-ink-dim)] group-hover:text-[var(--color-acid)] transition-colors">
           ↗
         </span>
       </div>
-    </a>
+      </div>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { fetchDiscoveryFeed } from "./api";
-import type { FeedItem } from "./types";
+import type { FeedItem, FeedMeta } from "./types";
 import { Marquee } from "./components/Marquee";
 import { ChainFilter } from "./components/ChainFilter";
 import { TokenCard } from "./components/TokenCard";
@@ -30,6 +30,18 @@ function fmtClock(d: Date): string {
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
 }
 
+function dedupeFeedItems(items: FeedItem[]): FeedItem[] {
+  const seen = new Set<string>();
+  const out: FeedItem[] = [];
+  for (const it of items) {
+    const k = `${it.profile.chainId}:${it.profile.tokenAddress.toLowerCase()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(it);
+  }
+  return out;
+}
+
 export default function App() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [deckRevision, setDeckRevision] = useState(0);
@@ -38,6 +50,7 @@ export default function App() {
   const [chain, setChain] = useState<string>("all");
   const [query, setQuery] = useState<string>("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [feedMeta, setFeedMeta] = useState<FeedMeta | null>(null);
   const now = useNow(1000);
 
   const load = useCallback(async (shuffleDeck = false) => {
@@ -45,7 +58,9 @@ export default function App() {
     setError(null);
     try {
       const data = await fetchDiscoveryFeed();
-      setItems(shuffleDeck ? shuffle(data.items) : data.items);
+      setFeedMeta(data.feed_meta ?? null);
+      const next = shuffleDeck ? shuffle(data.items) : data.items;
+      setItems(dedupeFeedItems(next));
       if (shuffleDeck) setDeckRevision((r) => r + 1);
       setLastUpdated(new Date());
       setStatus("ready");
@@ -94,7 +109,7 @@ export default function App() {
   const marqueeItems = useMemo(() => {
     const head = [
       "CORTISOL // TOKEN SURVEILLANCE TERMINAL",
-      "RATE LIMIT 60 RPM",
+      "DEDUPED // RECENT + BOOSTS + CTO + ADS + LATEST",
       "PAIR DATA · DISCOVERY RUBRIC",
       "SOURCE DEXSCREENER.COM",
       "EST 2026",
@@ -121,19 +136,14 @@ export default function App() {
                     Signal acquired
                   </span>
                 </span>
-                <span className="h-px w-8 bg-[var(--color-line-strong)]" />
-                <span>§ 01 / Live feed</span>
+                
+               
               </div>
               <h1 className="font-display text-[88px] md:text-[148px] leading-[0.88] tracking-[-0.02em] text-[var(--color-ink)]">
                 Cortisol
                 <span className="text-[var(--color-acid)]">.</span>
               </h1>
-              <p className="mt-6 max-w-2xl font-display italic text-[22px] md:text-[26px] leading-snug text-[var(--color-ink-dim)] text-balance">
-                A surveillance terminal for the chain. Latest token profiles,
-                drip-fed from Dexscreener &mdash; enriched with pair liquidity,
-                volume, flow, age, FDV, and momentum checks. Bad signals flagged
-                automatically (not financial advice).
-              </p>
+             
             </div>
 
             <div className="col-span-12 md:col-span-4 md:justify-self-end w-full md:w-auto">
@@ -151,6 +161,31 @@ export default function App() {
                 <Row
                   label="Signals"
                   value={items.length.toString().padStart(3, "0")}
+                  mono
+                />
+                <Row
+                  label="Dex merge"
+                  value={
+                    feedMeta?.unique_tokens != null
+                      ? feedMeta.unique_tokens.toString().padStart(3, "0")
+                      : "—"
+                  }
+                  mono
+                  warn={Boolean(feedMeta?.sources_failed)}
+                />
+                <Row
+                  label="Math filter"
+                  value={
+                    feedMeta?.mvp_math_pass_only
+                      ? `${(feedMeta.items_after_mvp_filter ?? 0)
+                          .toString()
+                          .padStart(2, "0")}/${(
+                          feedMeta.items_before_mvp_filter ?? 0
+                        )
+                          .toString()
+                          .padStart(2, "0")} MVP`
+                      : "Off"
+                  }
                   mono
                 />
                 <Row
@@ -209,7 +244,7 @@ export default function App() {
 
       <main className="mx-auto max-w-[1400px] px-6 md:px-10 py-8 md:py-12">
         <div className="flex items-center justify-between mb-6 font-mono text-[11px] tracking-[0.2em] uppercase text-[var(--color-ink-faint)]">
-          <span>§ 02 / Incoming transmissions</span>
+          <span>02 / Incoming transmissions</span>
           <span className="tab-num">
             {filtered.length.toString().padStart(3, "0")} /{" "}
             {items.length.toString().padStart(3, "0")}
@@ -227,6 +262,55 @@ export default function App() {
           </div>
         )}
 
+        {status === "ready" &&
+          items.length === 0 &&
+          feedMeta?.mvp_math_pass_only &&
+          (feedMeta.items_before_mvp_filter ?? 0) > 0 && (
+            <div className="hairline border-[var(--color-line-strong)] bg-[var(--color-bg-2)] p-6 mb-8 font-mono text-[11px] text-[var(--color-ink-dim)] tracking-[0.14em]">
+              <div className="uppercase text-[var(--color-ink-faint)] mb-2">
+                No MVP-pass tokens this poll
+              </div>
+              <p className="text-[10px] leading-relaxed max-w-xl">
+                The grid only shows rows that pass all market gates (liquidity floor, 1h
+                volume floor, buy pressure vs sells, known pair). The Dex merge had{" "}
+                <span className="text-[var(--color-acid)] tab-num">
+                  {feedMeta.items_before_mvp_filter}
+                </span>{" "}
+                profiles; none met that bar. Set{" "}
+                <span className="text-[var(--color-acid)]">
+                  CORTISOL_FEED_MATH_PASS_ONLY=0
+                </span>{" "}
+                in backend{" "}
+                <span className="text-[var(--color-acid)]">.env</span> or call the API
+                with{" "}
+                <span className="text-[var(--color-acid)]">mvp_pass_only=false</span> to
+                see the full list.
+              </p>
+            </div>
+          )}
+
+        {status === "ready" &&
+          items.length === 0 &&
+          feedMeta?.upstream_errors &&
+          feedMeta.upstream_errors.length > 0 && (
+            <div className="hairline border-[var(--color-line-strong)] bg-[var(--color-bg-2)] p-6 mb-8 font-mono text-[11px] text-[var(--color-ink-dim)] tracking-[0.14em]">
+              <div className="uppercase text-[var(--color-ink-faint)] mb-2">
+                Upstream paused (often HTTP 429)
+              </div>
+              <pre className="whitespace-pre-wrap text-[10px] leading-relaxed opacity-90">
+                {feedMeta.upstream_errors
+                  .map((e) => `${e.source}: ${e.detail}`)
+                  .slice(0, 4)
+                  .join("\n")}
+              </pre>
+              <p className="mt-3 text-[var(--color-ink-faint)] uppercase text-[10px]">
+                Try Repoll in ~60s or increase{" "}
+                <span className="text-[var(--color-acid)]">CORTISOL_DEX_LIST_PAUSE_SECONDS</span>{" "}
+                in backend .env (see README).
+              </p>
+            </div>
+          )}
+
         {status !== "error" && filtered.length === 0 && items.length > 0 && (
           <div className="hairline bg-[var(--color-bg-2)] p-10 text-center font-mono text-[11px] tracking-[0.2em] uppercase text-[var(--color-ink-faint)]">
             No matching profiles in the feed.
@@ -239,7 +323,10 @@ export default function App() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-[var(--color-line)]"
           >
             {filtered.map((it, i) => (
-              <div key={it.profile.tokenAddress} className="bg-[var(--color-bg)]">
+              <div
+                key={`${it.profile.chainId}:${it.profile.tokenAddress.toLowerCase()}`}
+                className="bg-[var(--color-bg)]"
+              >
                 <TokenCard item={it} index={i} />
               </div>
             ))}

@@ -17,9 +17,22 @@ export interface TokenProfile {
   updatedAt?: string;
 }
 
+export interface FeedMeta {
+  source_endpoints: number;
+  unique_tokens: number;
+  sources_failed?: number;
+  upstream_errors?: { source: string; detail: string }[] | null;
+  fallback?: string | null;
+  /** Backend: only tokens passing all MVP market gates (liquidity, vol h1, buy pressure, pair). */
+  mvp_math_pass_only?: boolean;
+  items_before_mvp_filter?: number;
+  items_after_mvp_filter?: number;
+}
+
 export interface ProfilesResponse {
   count: number;
   profiles: TokenProfile[];
+  feed_meta?: FeedMeta;
 }
 
 export interface DiscoveryFlag {
@@ -62,6 +75,31 @@ export interface DiscoveryResult {
   summary: "BAD" | "WARN" | "OK";
 }
 
+/** Backend Cortisol MVP pipeline (market → safety stubs → integrations). */
+export interface CortisolPipeline {
+  version?: string;
+  signal_score?: number;
+  risk_label?: string;
+  market_all_pass?: boolean;
+  eligible_for_trade_alert?: boolean;
+  eligible_for_telegram?: boolean;
+  mvp_gates_market?: Record<string, boolean>;
+  safety_tier?: string;
+  actions?: {
+    chart_url?: string | null;
+  };
+  integrations?: {
+    telegram?: { configured?: boolean };
+    discord?: { configured?: boolean };
+    jupiter?: {
+      ready?: boolean;
+      swap_preview_url_solana?: string | null;
+    };
+    phantom?: { browse_template?: string | null };
+    helius?: { rpc_configured?: boolean };
+  };
+}
+
 export interface SlimPair {
   chainId?: string;
   dexId?: string;
@@ -85,10 +123,12 @@ export interface FeedItem {
   pairs_found: number;
   pair_fetch_error: string | null;
   discovery: DiscoveryResult;
+  pipeline?: CortisolPipeline | null;
 }
 
 export interface DiscoveryFeedResponse {
   count: number;
   bad_count: number;
   items: FeedItem[];
+  feed_meta?: FeedMeta;
 }
